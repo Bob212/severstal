@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Табица в Северсталь</title>
+	<link rel="stylesheet" href="css/reset.css">
+	<script
+  src="https://code.jquery.com/jquery-3.3.1.min.js"
+  integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+  crossorigin="anonymous"></script>
+  <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
+	<style>
+		/* resets */
+* { color: inherit; }
+input { font: inherit; border: unset; background: unset; }
+input:focus { outline: unset; }
+
+#app {
+	display: flex;
+	padding: 10px;
+	flex-direction: column; justify-content: center; align-items: center;
+	height: 100vh;
+	font-weight: normal; font-size: 1rem;
+	color: hsl(0, 0%, 100%);
+	background: hsl(240, 100%, 67%);
+
+	font-family: 'Roboto', sans-serif;
+}
+#app table {
+	border: 1px solid #eee;
+}
+#app table thead {
+	background: rgba(0,0,0,.2);
+}
+#app table td {
+	border-right: 1px solid #eee;
+	border-bottom: 1px solid #eee;
+	padding: 10px;
+}
+#app table tr.children {
+	background: rgba(0,0,0,.3);
+}
+button {
+	border: 1px solid #eee;
+	cursor: pointer;
+	background: #eee;
+	border-radius: 3px;
+	color: #000;
+	margin-left: 10px;
+	transition: 0.3s;
+}
+button:hover {
+	background: #c7c7c7;
+	border-color: #c7c7c7;
+}
+.active-btn {
+	cursor: pointer;
+}
+.hide {
+	display: none;
+}
+.hide-active {
+	display: none;
+}
+
+
+	</style>
+</head>
+<body>
+<div id="app">
+	<table>
+		<thead>
+			<tr>
+				<td>Name</td>
+				<td>Email</td>
+				<td>Balance</td>
+				<td><button class="active-btn">All</button><button class="active-btn">True</button><button class="active-btn">False</button></td>
+			</tr>
+		</thead>
+		<tbody>
+			
+		</tbody>
+	</table>
+</div>
+
+	
+	<script>
+	document.addEventListener('DOMContentLoaded', function() {
+
+		// Тексты для кнопок
+		var buttonMoreText = ['Показать Дочерние', 'Скрыть дочерние'];
+		var buttonActiveStates = ["All", "True", "False"];
+
+
+		var xhr = new XMLHttpRequest();
+		xhr.open("GET", "data.json", true);
+		xhr.send();
+		var currentState = "arrival";	// какие строки сейчас отображаем: arrival / departure
+		xhr.onreadystatechange = function() {
+			if ( xhr.readyState != 4 ) return;
+			if ( xhr.status != 200 ) {
+				console.log(xhr.status + " : " + xhr.statusText );
+			} else {
+				var flight = JSON.parse(xhr.responseText);	// массив с рейсами
+				for (var i = 0; i< flight.length; i++) {
+					createRow(flight[i]);
+				}
+			}
+			makeButtonsActive();	// кнопки "Показать дочерние" работают
+		}
+
+
+
+		function createRow(object) {	// создаем строку
+			var id = object.id;
+			var parentId = object.parentId;
+			var name = createTDWithSpan(object.name);
+			var email = createTD(object.email);
+			var balance = createTD(object.balance);
+			var isActive = createTD(object.isActive);
+
+			var row = $("<tr></tr>").attr("data-id", id);
+
+			$( row ).append( name );
+			$( row ).append( email );
+			$( row ).append( balance );
+			$( row ).append( isActive );
+			$( row ).append( isActive );
+
+			if ( parentId == 0 ) {	// если нет родительского - просто выводим
+				$("#app table tbody").append(row);
+			} else {	// если есть родительский - скрываем и выводим под родителем
+				$(row).addClass("hide");
+				$(row).addClass("children");
+				$(row).attr("parent-id", parentId);
+
+				$("#app table tbody tr").each(function() {	// ищем, где родитель находится
+					if ( $(this).attr("data-id") == parentId ) {
+
+						if ( !$(this).attr('has-child') ) {	// если это первый дочерний элемент - создаем кнопку родителю
+							$(this).attr('has-child', 'true');	// маркер, чтобы вторая и далее кнопки не создавались
+							$("td span", this).after("<button parent-id='"+ parentId +"'>"+ buttonMoreText[0] +"</button>");
+						}
+						
+						$(this).after(row);	// за Родителем создаем
+					}
+				});
+			}
+			
+		}
+		function createTD(inner) {
+			return $("<td>"+inner+"</td>");
+		}
+		function createTDWithSpan(inner) {
+			return $("<td><span>"+inner+"</span></td>");
+		}
+		function makeButtonsActive() {	// нажатие кнопок Показать дочерние
+			$("#app table tbody button").each(function(){
+				$(this).click(function(){
+					if ( $(this).text() == buttonMoreText[0] ) {	// нажали Показать
+						$(this).text(buttonMoreText[1]);
+						showChildren( $(this).attr("parent-id") );
+					} else {										// нажали Скрыть
+						hideChildren( $(this).attr("parent-id") );
+					}
+				});
+			});
+		}
+		function showChildren(parent_id) {
+			for ( var i=0; i< $("#app table tr").length; i++ ) {
+				if ( $("#app table tr").eq(i).attr("parent-id") == parent_id ) {
+					$("#app table tr").eq(i).removeClass('hide');
+				}
+			}
+		}
+		function hideChildren(parent_id) {
+			$("#app table tr[data-id='"+parent_id+"'] button").text(buttonMoreText[0]);
+			for ( var i=0; i< $("#app table tr").length; i++ ) {
+				if ( $("#app table tr").eq(i).attr("parent-id") == parent_id ) {	// если id совпали
+					$("#app table tr").eq(i).addClass('hide');
+					if ( $("#app table tr").eq(i).attr("has-child") == "true" ) {
+						hideChildren( $("#app table tr").eq(i).attr("data-id") );
+					}
+				}
+			}
+		}
+		$(".active-btn").each(function(){	// Кнопки All , True , False
+			$(this).click(function(){
+			if ( $(this).text() == buttonActiveStates[0] ) {	// нажато All
+				hideOnly();
+				return
+			}
+			if ( $(this).text() == buttonActiveStates[1] ) {	// нажато True
+				hideOnly("false");
+				return
+			}
+			if ( $(this).text() == buttonActiveStates[2] ) {	// нажато False
+				hideOnly("true");
+				return
+			}
+		});
+		});
+		function hideOnly(state) {
+				$("#app table tr").each(function(){	// перебираем все строки
+					$(this).removeClass("hide-active");
+					if( $("td:last-child", this).text() == state ) {
+						$(this).addClass("hide-active");
+					}
+				});
+		}
+
+	});
+		
+		
+
+		
+		
+	</script>
+</body>
+
+<!-- 
+Задача:
+
+Исходя из приложенных данных(прикреплены к письму) постройте таблицу с возможностью раскрытия строк, имеющих дочерние элементы, а также фильтрацией по свойству "isActive".
+Для решения задачи можно использовать библиотеку jQuery.
+ -->
+
+</html>
